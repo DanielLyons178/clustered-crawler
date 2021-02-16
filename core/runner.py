@@ -1,4 +1,7 @@
 import argparse
+from core.engine.comms.output.redis_state_maintainer import RedisStateMaintainer
+
+import redis
 from core.engine.comms.output.rabbit_link_writer import RabbitLinkWriter
 from core.lib.link_extraction.link_extractor import LinkExtractor
 import threading
@@ -69,16 +72,24 @@ def run_core(args):
         "join",
     )
     cacher = VisitCacher(args.redis_host, args.redis_port, args.redis_password)
-    engn = ScraperEngine(link_receiver, cacher)
+
+    redis = redis.StrictRedis(args.redis_host, args.redis_port, args.redis_password)
+    state_maintainer = RedisStateMaintainer(redis)
+    registered_outputters = state_maintainer.get_outputters()
+    engn = ScraperEngine(link_receiver, cacher, state_maintainer)
+
     outputter_factory = RabbitOutputterFactory(
         args.rabbit_host, args.rabbit_port, (args.rabbit_user, args.rabbit_password)
     )
 
     join_listenter = JoinListener(join_receiver, engn, outputter_factory)
-    join_listener_thread = threading.Thread(target=join_listenter.run)
+    for outputter in registered_outputters:
+        join_listenter.post(outputter)
 
+        
+    join_listener_thread = threading.Thread(target=join_listenter.run)
     join_listener_thread.start()
-   
+
     engn.run()
 
 

@@ -10,11 +10,15 @@ class JoinListener:
 
     def run(self):
         logging.getLogger("Joiner").info("Listening for cluster joins")
-        self.receiver.poll(self._add)
+        self.receiver.poll(self._handle)
 
-    def _add(self, msg):
+    def _handle(self, msg):
+        #TODO add remove functionality
         msg = json.loads(msg)
         q = msg["queue"]
         if not self.engine.is_registered(q):
             outputter = self.outputter_factory.create(q)
             self.engine.join(outputter)
+        
+    def post(self, queue):
+        self._handle({"queue": queue})
