@@ -1,16 +1,20 @@
 import argparse
+from core.engine.comms.output.result_outputter import ResultOutputter
+from uuid import uuid4
+from core.engine.comms.output.link_writer import LinkWriter
+from core.engine.comms.rabbit.rabbit_reciever import RabbitReciever
+from core.engine.comms.rabbit.rabbit_outputter import RabbitOutputter
+from core.engine.comms.rabbit.rabbit_helpers import rabbit_blocking_connection_factory
 from core.engine.comms.output.redis_state_maintainer import RedisStateMaintainer
 
 import redis
-from core.engine.comms.output.rabbit_link_writer import RabbitLinkWriter
+
 from core.lib.link_extraction.link_extractor import LinkExtractor
-import threading
 import importlib
 import logging
-from core.engine.comms.output.outputter_factory import RabbitOutputterFactory
-from core.engine.join_listener import JoinListener
+
+
 from core.engine.comms.output.visit_cacher import VisitCacher
-from core.engine.comms.link_receive.rabbit_reciever import RabbitReciever
 from core.engine.scraper_engine import ScraperEngine
 
 
@@ -59,36 +63,20 @@ def main():
 
 def run_core(args):
 
+    conn_factory = rabbit_blocking_connection_factory(
+        args.rabbit_host,
+        args.rabbit_port,
+        (args.rabbit_user, args.rabbit_password),
+    )
+    rabbit_outputter = RabbitOutputter(("result", "topic"), conn_factory)
+    result_outputter = ResultOutputter(rabbit_outputter)
+
     link_receiver = RabbitReciever(
-        args.rabbit_host,
-        args.rabbit_port,
-        (args.rabbit_user, args.rabbit_password),
-        "links",
+        conn_factory, ("links", "fanout"), str(uuid4()), [""]
     )
-    join_receiver = RabbitReciever(
-        args.rabbit_host,
-        args.rabbit_port,
-        (args.rabbit_user, args.rabbit_password),
-        "join",
-    )
+
     cacher = VisitCacher(args.redis_host, args.redis_port, args.redis_password)
-
-    redis = redis.StrictRedis(args.redis_host, args.redis_port, args.redis_password)
-    state_maintainer = RedisStateMaintainer(redis)
-    registered_outputters = state_maintainer.get_outputters()
-    engn = ScraperEngine(link_receiver, cacher, state_maintainer)
-
-    outputter_factory = RabbitOutputterFactory(
-        args.rabbit_host, args.rabbit_port, (args.rabbit_user, args.rabbit_password)
-    )
-
-    join_listenter = JoinListener(join_receiver, engn, outputter_factory)
-    for outputter in registered_outputters:
-        join_listenter.post(outputter)
-
-        
-    join_listener_thread = threading.Thread(target=join_listenter.run)
-    join_listener_thread.start()
+    engn = ScraperEngine(link_receiver, cacher, [result_outputter])
 
     engn.run()
 
@@ -111,19 +99,15 @@ def run_link_extractor(args):
     splits = [clazz.split(".") for clazz in classes]
     module_classes = [(split[:-1], split[-1]) for split in splits]
 
-    link_writer = RabbitLinkWriter(
+    conn_factory = rabbit_blocking_connection_factory(
         args.rabbit_host,
         args.rabbit_port,
         (args.rabbit_user, args.rabbit_password),
-        "links",
     )
 
-    joiner = RabbitLinkWriter(
-        args.rabbit_host,
-        args.rabbit_port,
-        (args.rabbit_user, args.rabbit_password),
-        "join",
-    )
+    link_outputter = RabbitOutputter(("links", "fanout"), conn_factory)
+    link_writer = LinkWriter(link_outputter)
+
     for (module_str, clazz_str) in module_classes:
         module_str = ".".join(module_str)
         module = importlib.import_module(module_str)
@@ -132,14 +116,11 @@ def run_link_extractor(args):
         if not issubclass(clazz, LinkExtractor):
             raise Exception("Must subclass LinkExtractor")
 
+        ex = clazz(link_writer)
         rec = RabbitReciever(
-            args.rabbit_host,
-            args.rabbit_port,
-            (args.rabbit_user, args.rabbit_password),
-            f"{module_str}.{clazz_str}",
+            conn_factory, ("result", "topic"), f"{module_str}.{clazz_str}", ex.for_links_pattern()
         )
-
-        ex = clazz(rec, link_writer, joiner)
+        ex.register_receiver(rec)
         ex.run()
 
 
