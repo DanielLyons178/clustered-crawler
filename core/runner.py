@@ -9,13 +9,12 @@ from core.engine.comms.output.redis_state_maintainer import RedisStateMaintainer
 
 import redis
 
+from core.engine.comms.redis.redis_cacher import RedisVisitCacher
+from core.engine.scraper_engine import ScraperEngine
 from core.lib.link_extraction.link_extractor import LinkExtractor
 import importlib
 import logging
 
-
-from core.engine.comms.output.visit_cacher import VisitCacher
-from core.engine.scraper_engine import ScraperEngine
 
 
 from core.web.server import app
@@ -75,7 +74,7 @@ def run_core(args):
         conn_factory, ("links", "fanout"), str(uuid4()), [""]
     )
 
-    cacher = VisitCacher(args.redis_host, args.redis_port, args.redis_password)
+    cacher = RedisVisitCacher(args.redis_host, args.redis_port, args.redis_password)
     engn = ScraperEngine(link_receiver, cacher, [result_outputter])
 
     engn.run()

@@ -1,7 +1,8 @@
+from core.engine.comms.output.visit_recorder import VisitRecorder
 import redis
 
 
-class VisitCacher:
+class RedisVisitCacher(VisitRecorder):
 
     HASH = "visits"
 
