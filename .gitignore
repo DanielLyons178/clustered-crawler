@@ -35,6 +35,7 @@ tmp/**
 .python-version
 .vs/
 test-results*.xml
+**/dist/**
 xunit-test-results.xml
 build/ci/performance/performance-results.json
 !build/
