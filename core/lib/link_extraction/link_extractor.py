@@ -8,7 +8,7 @@ class LinkExtractor(ABC):
         self._sender = sender
 
     def process_links(self, html):
-        links = self.extract_links(html)
+        links = self.extract_links(json.loads(html))
         for link in links:
             self._sender.put(link)
 

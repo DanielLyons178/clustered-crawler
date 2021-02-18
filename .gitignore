@@ -28,6 +28,7 @@ debug_coverage*/**
 languageServer/**
 languageServer.*/**
 bin/**
+**/localonly/**
 obj/**
 .pytest_cache
 tmp/**
