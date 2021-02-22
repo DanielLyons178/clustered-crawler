@@ -1,5 +1,4 @@
-import json
-from core.engine.visitor.visitor import Visitor
+from .visitor.visitor import Visitor
 import logging
 
 

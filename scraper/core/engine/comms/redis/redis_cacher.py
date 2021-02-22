@@ -1,4 +1,4 @@
-from core.engine.comms.output.visit_recorder import VisitRecorder
+from ..output.visit_recorder import VisitRecorder
 import redis
 
 

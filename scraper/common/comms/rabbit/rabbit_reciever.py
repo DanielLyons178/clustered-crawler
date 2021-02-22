@@ -21,6 +21,7 @@ class RabbitReciever:
             self.chnl.queue_bind(
                 exchange=exchange_name, queue=queue_name, routing_key=binding
             )
+      
 
     def poll(self, callback):
         self.chnl.basic_consume(

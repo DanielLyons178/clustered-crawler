@@ -3,4 +3,4 @@ class LinkWriter:
         self.outputter = outputter
 
     def put(self, link):
-        self.outputter.put(link)
+        self.outputter.put(link, "links")
