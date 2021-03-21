@@ -1,0 +1,69 @@
+version: "3.9"
+
+services: 
+  core:
+    build: 
+      context: ../
+      dockerfile: ./docker/scraper-core/Dockerfile
+    environment: 
+      - "RABBIT_HOST=scrape-queue" 
+      - "RABBIT_PORT=5672"
+      - "RABBIT_USER=${RABBITMQ_DEFAULT_USER}" 
+      - "RABBIT_PASS=${RABBITMQ_DEFAULT_PASS}" 
+      - "REDIS_HOST=scrape-cache" 
+      - "REDIS_PORT=6379"
+      - "REDIS_PASS=${REDIS_PASS}"
+    depends_on: 
+      - "scrape-queue"
+      - "scrape-cache"
+    restart: on-failure
+
+  sample-link-extractor: 
+    build: 
+      context: ../
+      dockerfile: ./docker/sample/Dockerfile
+    environment: 
+      - "RABBIT_HOST=scrape-queue" 
+      - "RABBIT_PORT=5672" 
+      - "RABBIT_USER=${RABBITMQ_DEFAULT_USER}" 
+      - "RABBIT_PASS=${RABBITMQ_DEFAULT_PASS}" 
+    command: links --extractors sample.sample_extractor.SampleExtractor
+    depends_on: 
+      - "scrape-queue"
+    restart: on-failure
+
+  sample-body-reader: 
+    build: 
+      context: ../
+      dockerfile: ./docker/sample/Dockerfile
+    environment: 
+      - "RABBIT_HOST=scrape-queue" 
+      - "RABBIT_PORT=5672" 
+      - "RABBIT_USER=${RABBITMQ_DEFAULT_USER}" 
+      - "RABBIT_PASS=${RABBITMQ_DEFAULT_PASS}" 
+    command: body -br sample.sample_extractor.SampleReader
+    depends_on: 
+      - "scrape-queue"
+    restart: on-failure
+
+
+  scrape-queue:
+    image: rabbitmq:3-management
+    ports: 
+      - "5672:5672"
+      - "15672:15672"
+    hostname: scrape-queue
+    env_file: .env
+    healthcheck:
+        test: ["CMD", "curl", "-f", "http://localhost:15672"]
+        interval: 30s
+        timeout: 10s
+        retries: 5
+
+  scrape-cache:
+    image: 'redis:4-alpine'
+    command: redis-server --requirepass ${REDIS_PASS}
+    ports:
+      - '6379:6379'
+
+   

@@ -1,15 +1,14 @@
 import argparse
 
-from scraper.client.runner import run_link_extractor, add_modes, run_result_processor
-
-from scraper.core.engine.comms.output.result_outputter import ResultOutputter
+import os
+from .engine.comms.output.result_outputter import ResultOutputter
 from scraper.common.comms.rabbit.rabbit_reciever import RabbitReciever
 from scraper.common.comms.rabbit.rabbit_outputter import RabbitOutputter
 from scraper.common.comms.rabbit.rabbit_helpers import (
     rabbit_blocking_connection_factory,
 )
-from scraper.core.engine.comms.redis.redis_cacher import RedisVisitCacher
-from scraper.core.engine.scraper_engine import ScraperEngine
+from .engine.comms.redis.redis_cacher import RedisVisitCacher
+from .engine.scraper_engine import ScraperEngine
 import logging
 
 
@@ -20,34 +19,23 @@ def main():
 
     parser = argparse.ArgumentParser(description="Distributed Scraper")
 
-    subs = parser.add_subparsers(dest="mode")
-    core_parser = subs.add_parser("core")
-
-    add_modes(subs)
-
     opts = [
-        ("--rabbit_host", "-rh"),
-        ("--rabbit_port", "-rp"),
-        ("--rabbit_user", "-ru"),
-        ("--rabbit_password", "-rpwd"),
+        ("--rabbit_host", "-rh", os.environ.get('RABBIT_HOST')),
+        ("--rabbit_port", "-rp", os.environ.get('RABBIT_PORT', '5672')),
+        ("--rabbit_user", "-ru", os.environ.get('RABBIT_USER')),
+        ("--rabbit_password", "-rpwd", os.environ.get('RABBIT_PASS')),
     ]
 
     for opt in opts:
-        parser.add_argument(opt[0], opt[1])
+        parser.add_argument(opt[0], opt[1], default=opt[2])
 
-    redis_group = core_parser.add_argument_group("redis")
-    redis_group.add_argument("--redis_host", "-rh")
-    redis_group.add_argument("--redis_port", "-rp")
-    redis_group.add_argument("--redis_password", "-rpwd")
+    redis_group = parser.add_argument_group("redis")
+    redis_group.add_argument("--redis_host", "-redh", default=os.environ.get('REDIS_HOST'))
+    redis_group.add_argument("--redis_port", "-redp", default=os.environ.get('REDIS_PORT'))
+    redis_group.add_argument("--redis_password", "-redpwd", default=os.environ.get('REDIS_PASS'))
 
     args = parser.parse_args()
-
-    if args.mode == "core":
-        run_core(args)
-    elif args.mode == "links":
-        run_link_extractor(args)
-    elif args.mode == "body":
-        run_result_processor(args)
+    run_core(args)
 
 
 def run_core(args):

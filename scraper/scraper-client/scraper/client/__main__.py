@@ -1,32 +1,37 @@
+import logging
 import importlib
 import argparse
-from scraper.client.lib.link_extraction.link_extractor import LinkExtractor
-from scraper.client.lib.body_reader.body_reader import BodyReader
-from scraper.client.link_writer import LinkWriter
+import os
+from .lib.link_extraction.link_extractor import LinkExtractor
+from .lib.body_reader.body_reader import BodyReader
+from .link_writer import LinkWriter
 from scraper.common.comms.rabbit.rabbit_outputter import RabbitOutputter
 from scraper.common.comms.rabbit.rabbit_reciever import RabbitReciever
 from scraper.common.comms.rabbit.rabbit_helpers import (
     rabbit_blocking_connection_factory,
 )
 
+
 def main():
+    logging.basicConfig()
+    logging.getLogger().setLevel(logging.INFO)
     parser = argparse.ArgumentParser(description="Distributed Scraper")
     subs = parser.add_subparsers(dest="mode")
 
     add_modes(subs)
 
     opts = [
-        ("--rabbit_host", "-rh"),
-        ("--rabbit_port", "-rp"),
-        ("--rabbit_user", "-ru"),
-        ("--rabbit_password", "-rpwd"),
+        ("--rabbit_host", "-rh", os.environ.get("RABBIT_HOST")),
+        ("--rabbit_port", "-rp", os.environ.get("RABBIT_PORT", "5672")),
+        ("--rabbit_user", "-ru", os.environ.get("RABBIT_USER")),
+        ("--rabbit_password", "-rpwd", os.environ.get("RABBIT_PASS")),
     ]
 
     for opt in opts:
-        parser.add_argument(opt[0], opt[1])
+        parser.add_argument(opt[0], opt[1], default=opt[2])
 
     args = parser.parse_args()
-
+    print(args)
     if args.mode == "links":
         run_link_extractor(args)
     elif args.mode == "body":
@@ -84,6 +89,7 @@ def _get_rabbit_conn_factory(args):
         args.rabbit_port,
         (args.rabbit_user, args.rabbit_password),
     )
+
 
 def _get_constructors(class_string, super_class):
     classes = class_string.split(",")
